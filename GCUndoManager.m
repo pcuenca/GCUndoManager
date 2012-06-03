@@ -1467,6 +1467,13 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 }
 
 
+- (NSInvocation *)		invocation
+{
+	return mInvocation;
+}
+
+
+
 #pragma mark -
 #pragma mark - as a GCUndoTask
 

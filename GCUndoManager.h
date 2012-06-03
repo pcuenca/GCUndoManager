@@ -265,6 +265,7 @@ extern NSString * const GCUndoManagerActionKey;
 - (void)				setTarget:(id) target retained:(BOOL) retainIt;
 - (id)					target;
 - (SEL)					selector;
+- (NSInvocation *)		invocation;
 
 @end
 
