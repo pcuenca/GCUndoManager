@@ -1070,7 +1070,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			else
 				selString = @"<subgroup>";
 			
-			[newTaskGroup setActionName:[NSString stringWithFormat:@"%@ (%lu: %@)", [topGroup actionName], ++suffix, selString ]];
+			[newTaskGroup setActionName:[NSString stringWithFormat:@"%@ (%u: %@)", [topGroup actionName], ++suffix, selString ]];
 			[self pushGroupOntoUndoStack:newTaskGroup];
 			[newTaskGroup release];
 		}
@@ -1139,7 +1139,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (NSString*)			description
 {
-	return [NSString stringWithFormat:@"%@ g-level = %ld, state = %d, u-stack: %@, r-stack: %@", [super description], [self groupingLevel], [self undoManagerState], [self undoStack], [self redoStack]];
+	return [NSString stringWithFormat:@"%@ g-level = %d, state = %d, u-stack: %@, r-stack: %@", [super description], [self groupingLevel], [self undoManagerState], [self undoStack], [self redoStack]];
 }
 
 
@@ -1187,7 +1187,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (GCUndoTask*)			taskAtIndex:(NSUInteger) indx
 {
-	THROW_IF_FALSE2( indx < [[self tasks] count], @"invalid task index (%lu) in group %@", indx, self );
+	THROW_IF_FALSE2( indx < [[self tasks] count], @"invalid task index (%u) in group %@", indx, self );
 	
 	return [[self tasks] objectAtIndex:indx];
 }
@@ -1373,7 +1373,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (NSString*)			description
 {
-	return [NSString stringWithFormat:@"%@ '%@' %lu tasks: %@", [super description], [self actionName], [mTasks count], mTasks];
+	return [NSString stringWithFormat:@"%@ '%@' %u tasks: %@", [super description], [self actionName], [mTasks count], mTasks];
 }
 
 @end
