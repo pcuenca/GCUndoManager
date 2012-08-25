@@ -3,7 +3,7 @@
 //  GCDrawKit
 //
 //  Created by graham on 4/12/09.
-//  Copyright 2009-2011 Apptree.net. All rights reserved.
+//  Copyright 2009-2012 Apptree.net. All rights reserved.
 //
 
 // VERSION HISTORY:
@@ -11,6 +11,8 @@
 // 2010/01/01 - fixes for Core Data, optional retaining of targets, and prevention of reentrancy when removing tasks
 // 2011/01/11 - fix to ensure submitting tasks in response to a checkpoint notification is correctly handled
 // 2011/07/08 - added NSUndoManagerDidCloseUndoGroupNotification for 10.7 (Lion) compatibility
+
+#import <Foundation/Foundation.h>
 
 // internal undo manager state is one of these constants
 
@@ -36,8 +38,7 @@ extern NSString * const GCUndoManagerActionKey;
 @class GCUndoGroup, GCUndoManagerProxy, GCConcreteUndoTask;
 
 // the undo manager is a public-API compatible replacement for NSUndoManager but features a simpler internal implementation, some bug fixes and less
-// fragility than NSUndoManager. It can be used with NSDocument's -setUndoManager: method (cast to id or NSUndoManager). However its compatibility with
-// Core Data is unknown and untested at this time. See further notes at the end of this file.
+// fragility than NSUndoManager. It can be used with NSDocument's -setUndoManager: method (cast to id or NSUndoManager*). It is compatible with Core Data, traditional retain-release, and garbage collection.
 
 
 @interface GCUndoManager : NSObject
@@ -101,6 +102,24 @@ extern NSString * const GCUndoManagerActionKey;
 
 // undo menu management
 
+// sets the action name of the receiver's current undo group
+// setting the action name should be done as a high-level "finishing off"
+// work within the controller layer of the MVC layering.  usually, the
+// action name is set at the end of an action method (I believe it's no
+// coincidence that the UM uses the term 'action name' to suggest a
+// connection with an 'action method').  example:
+// - (IBAction)		someAction:(id) sender
+// {
+//      [dataModel doThis];	 // undoable
+//      [dataModel doThat];	 // undoable
+//      [[self undoManager] setActionName:[sender title]];
+// }
+// Even if -doThis and -doThat set action names, these are ignored
+// because the last action name set is the one that "sticks".  also, in this
+// example I use the sender's title as the action name, which works great for
+// menu and button actions, and means that the action is automatically
+// localised along with the UI.  for actions triggered by other elements, a
+// fixed localisable string does the job.
 - (void)				setActionName:(NSString*) actionName;
 - (NSString*)			undoActionName;
 - (NSString*)			redoActionName;
@@ -231,7 +250,7 @@ extern NSString * const GCUndoManagerActionKey;
 - (GCConcreteUndoTask*)	lastTaskIfConcrete;
 - (NSArray*)			tasks;
 - (NSArray*)			tasksWithTarget:(id) target selector:(SEL) selector;
-- (BOOL)				isEmpty;
+- (BOOL)				hasTask;
 
 - (void)				removeTasksWithTarget:(id) aTarget undoManager:(GCUndoManager*) um;
 - (void)				setActionName:(NSString*) name;

@@ -105,6 +105,9 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 		THROW_IF_FALSE( mGroupLevel >= 0, @"group level is negative - internal inconsistency");
 		THROW_IF_FALSE( mOpenGroupRef != nil, @"bad group state - attempt to close a nested group with no group open");
 		
+		// the value of this may change after we pop or remove empty groups, so grab it now
+		BOOL hadTasksBeforeEnding = [[self currentGroup] hasTask];
+		
 		if( mGroupLevel == 0 )
 		{
 			// closing outer group. If it's empty, remove it. This is what NSUndoManager should do, but doesn't. That means that this
@@ -114,7 +117,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			
 			@try
 			{
-				if([self automaticallyDiscardsEmptyGroups] && [[self currentGroup] isEmpty])
+				if([self automaticallyDiscardsEmptyGroups] && !hadTasksBeforeEnding)
 				{
 					if([self isUndoing])
 						[self popRedo];
@@ -167,16 +170,19 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 		// see: https://devforums.apple.com/thread/110036?tstart=0
 		// GCUndoManager sends this notification as well. This is necessary for NSDocument compatibility on 10.7, but may be used on
 		// earlier systems if you wish. The notification is only sent while collecting tasks, not when undoing or redoing.
+		// We also apply the same improvement over NSUndoManager regarding ignoring empty undo groups which is explained
+		// above, not posting this in the same way that we don't post NSUndoManagerWillCloseUndoGroupNotification.
+		// NSUndoManagerWillCloseUndoGroupNotification and NSUndoManagerDidCloseUndoGroupNotification, if posted, will
+		// always be posted in pairs.
 		
-		if([self undoManagerState] == kGCUndoCollectingTasks)
+		if((![self automaticallyDiscardsEmptyGroups] || hadTasksBeforeEnding) && ([self undoManagerState] == kGCUndoCollectingTasks))
 		{
 			// if this action is discardable, create userInfo indicating such
 			GCUndoGroup* topGroup = [self peekUndo] ;
 			NSDictionary* userInfo = nil ;
 			if ([topGroup actionIsDiscardable]) {
-				// If the deployment target is 10.7 or later, the NSUndoManagerGroupIsDiscardableKey global is available,
-				// otherwise we just rely on it's string value, which is unlikely to change.
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+				// To explain this #if, see note following end of this method.
+#if ((MAC_OS_X_VERSION_MAX_ALLOWED >= 1070) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1070))
 				userInfo = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:NSUndoManagerGroupIsDiscardableKey] ;
 #else
 				userInfo = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:@"NSUndoManagerGroupIsDiscardableKey"] ;
@@ -184,9 +190,8 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			}
 
 			NSNotificationCenter* notificationCenter = [NSNotificationCenter defaultCenter];
-			// If the deployment target is 10.7 or later, the NSUndoManagerDidCloseUndoGroupNotification global is available,
-			// otherwise we just rely on it's string value, which is unlikely to change.
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+			// To explain this #if, see note following end of this method.
+#if ((MAC_OS_X_VERSION_MAX_ALLOWED >= 1070) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1070))
 			[notificationCenter postNotificationName:NSUndoManagerDidCloseUndoGroupNotification object:self userInfo:userInfo];
 #else
 			[notificationCenter postNotificationName:@"NSUndoManagerDidCloseUndoGroupNotification" object:self userInfo:userInfo];
@@ -194,6 +199,13 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 		}
 	}
 }
+// explanation of #if in -endUndoGrouping
+// we have a string constant symbol which is defined in the 10.7 SDK and used by the 10.7 runtime.  this creates two problems.
+// problem 1.  when *compiling* in a system prior to 10.7, it won't even compile with this symbol.
+// problem 2.  when *running* in a system prior to 10.7, when accessing the undefined symbol, the app will crash.
+// to solve problem 1, we require that (MAC_OS_X_VERSION_MAX_ALLOWED >= 1070).
+// to solve problem 2, we require that (MAC_OS_X_VERSION_MIN_REQUIRED >= 1070).
+// hence the && in the #if.
 
 
 
@@ -566,7 +578,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			
 			// delete groups that become empty unless it's the current group
 			
-			if([task isEmpty] && task != [self currentGroup])
+			if(![task hasTask] && task != [self currentGroup])
 			{
 				[mUndoStack removeObject:task];
 			}
@@ -583,7 +595,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			
 			// delete groups that become empty unless it's the current group
 			
-			if([task isEmpty] && task != [self currentGroup])
+			if(![task hasTask] && task != [self currentGroup])
 			{
 				[mRedoStack removeObject:task];
 			}
@@ -861,7 +873,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 {
 	// pops the top undo group and invokes all of its tasks
 	
-	if([self numberOfUndoActions] > 0 && ![[self peekUndo] isEmpty])
+	if([self numberOfUndoActions] > 0 && [[self peekUndo] hasTask])
 	{
 		NSNotificationCenter* notificationCenter = [NSNotificationCenter defaultCenter];
 		[notificationCenter postNotificationName:NSUndoManagerWillUndoChangeNotification object:self];
@@ -912,7 +924,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 {
 	// pops the top redo group and invokes all of its tasks
 	
-	if([self numberOfRedoActions] > 0 && ![[self peekUndo] isEmpty])
+	if(([self numberOfRedoActions] > 0) && [[self peekRedo] hasTask])
 	{
 		NSNotificationCenter* notificationCenter = [NSNotificationCenter defaultCenter];
 		[notificationCenter postNotificationName:NSUndoManagerWillRedoChangeNotification object:self];
@@ -1070,7 +1082,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			else
 				selString = @"<subgroup>";
 			
-			[newTaskGroup setActionName:[NSString stringWithFormat:@"%@ (%u: %@)", [topGroup actionName], ++suffix, selString ]];
+			[newTaskGroup setActionName:[NSString stringWithFormat:@"%@ (%lu: %@)", [topGroup actionName], (unsigned long)++suffix, selString ]];
 			[self pushGroupOntoUndoStack:newTaskGroup];
 			[newTaskGroup release];
 		}
@@ -1139,7 +1151,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (NSString*)			description
 {
-	return [NSString stringWithFormat:@"%@ g-level = %d, state = %d, u-stack: %@, r-stack: %@", [super description], [self groupingLevel], [self undoManagerState], [self undoStack], [self redoStack]];
+	return [NSString stringWithFormat:@"%@ g-level = %ld, state = %d, u-stack: %@, r-stack: %@", [super description], (long)[self groupingLevel], [self undoManagerState], [self undoStack], [self redoStack]];
 }
 
 
@@ -1166,7 +1178,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 {
 	// abstract class - override to implement
 	
-	NSAssert( NO, @"-perform must be overridden");
+	NSAssert( NO, @"-perform must be overridden", nil);
 }
 
 @end
@@ -1187,7 +1199,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (GCUndoTask*)			taskAtIndex:(NSUInteger) indx
 {
-	THROW_IF_FALSE2( indx < [[self tasks] count], @"invalid task index (%u) in group %@", indx, self );
+	THROW_IF_FALSE2( indx < [[self tasks] count], @"invalid task index (%lu) in group %@", (unsigned long)indx, self );
 	
 	return [[self tasks] objectAtIndex:indx];
 }
@@ -1239,12 +1251,12 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 }
 
 
-- (BOOL)				isEmpty
+- (BOOL)				hasTask
 {
 	// return whether the group contains any actual tasks. If it only contains other empty groups, returns YES.
 	
 	if([[self tasks] count] == 0 )
-		return YES;
+		return NO;
 	else
 	{
 		NSEnumerator*	iter = [[self tasks] objectEnumerator];
@@ -1256,15 +1268,15 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			{
 				// is a group - is that one empty?
 				
-				if( ![(GCUndoGroup*)task isEmpty])
-					return NO;
+				if([(GCUndoGroup*)task hasTask])
+					return YES;
 			}
 			else
-				return NO;
+				return YES;
 		}
 	}
 	
-	return YES;
+	return NO;
 }
 
 
@@ -1283,7 +1295,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 		{
 			[(GCUndoGroup*)task removeTasksWithTarget:aTarget undoManager:um];
 			
-			if([(GCUndoGroup*)task isEmpty] && [um currentGroup] != task)
+			if(![(GCUndoGroup*)task hasTask] && [um currentGroup] != task)
 				[mTasks removeObject:task];
 		}
 		else if([task respondsToSelector:@selector(target)])
@@ -1373,7 +1385,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (NSString*)			description
 {
-	return [NSString stringWithFormat:@"%@ '%@' %u tasks: %@", [super description], [self actionName], [mTasks count], mTasks];
+	return [NSString stringWithFormat:@"%@ '%@' %lu tasks: %@", [super description], [self actionName], (unsigned long)[mTasks count], mTasks];
 }
 
 @end
