@@ -1349,7 +1349,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 {
 	// cause the tasks in the group to be executed IN REVERSE ORDER. Subgroups are recursively executed.
 	
-	NSInteger i = [[self tasks] count];
+	NSUInteger i = [[self tasks] count];
 	
 	while( i-- > 0 )
 		[[self taskAtIndex:i] perform];
