@@ -77,8 +77,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 		}
 		
 		mOpenGroupRef = newGroup;
-		[newGroup release];
-		
+
 		if(![self isUndoing] && mGroupLevel > 0 )
 			[self checkpoint];
 		
@@ -378,26 +377,6 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 }
 
 
-
-- (NSArray*)			runLoopModes
-{
-	return mRunLoopModes;
-}
-
-
-
-- (void)				setRunLoopModes:(NSArray*) modes
-{
-	[modes retain];
-	[mRunLoopModes release];
-	mRunLoopModes = modes;
-	
-	// n.b. if this is changed while a callback is pending, the new modes won't take effect until
-	// the next event cycle.
-}
-
-
-
 - (void)				setActionName:(NSString*) actionName
 {
 	// for compatibility with NSUndoManager, conditionally open a group - this allows an action name to be set
@@ -512,8 +491,8 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 	{
 		THROW_IF_FALSE( invocation != nil, @"-forwardInvocation: was passed an invalid nil invocation" );
 		
-		GCConcreteUndoTask* task = [[[GCConcreteUndoTask alloc] initWithInvocation:invocation] autorelease];
-		[task setTarget:mNextTarget retained:[self retainsTargets]];
+		GCConcreteUndoTask* task = [[GCConcreteUndoTask alloc] initWithInvocation:invocation];
+		[task setTarget:mNextTarget];
 		[self submitUndoTask:task];
 	}
 	mNextTarget = nil;
@@ -531,8 +510,8 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 	{
 		THROW_IF_FALSE( selector != NULL, @"invalid (NULL) selector passed to registerUndoWithTarget:selector:object:" );
 		
-		GCConcreteUndoTask* task = [[[GCConcreteUndoTask alloc] initWithTarget:target selector:selector object:anObject] autorelease];
-		[task setTarget:target retained:[self retainsTargets]];
+		GCConcreteUndoTask* task = [[GCConcreteUndoTask alloc] initWithTarget:target selector:selector object:anObject];
+		[task setTarget:target];
 		[self submitUndoTask:task];
 	}
 	mNextTarget = nil;
@@ -583,9 +562,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 				[mUndoStack removeObject:task];
 			}
 		}
-		
-		[temp release];
-		
+
 		temp = [[self redoStack] copy];
 		iter = [temp objectEnumerator];
 		
@@ -600,9 +577,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 				[mRedoStack removeObject:task];
 			}
 		}
-		
-		[temp release];
-		
+
 		mIsRemovingTargets = NO;
 	}
 	mNextTarget = nil;
@@ -677,22 +652,6 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 - (GCUndoTaskCoalescingKind) coalescingKind
 {
 	return mCoalKind;
-}
-
-
-- (void)				setRetainsTargets:(BOOL) retainsTargets
-{
-	// NSUndoManager does not retain its targets. In general, that is the right thing to do, but simpler memory management can
-	// be obtained when targets are retained. The default is NO, and should only be set to YES if you are certain of the consequences.
-	// Note that existing invocations are unaffected by this being changed, only subsequent ones are.
-	
-	mRetainsTargets = retainsTargets;
-}
-
-
-- (BOOL)				retainsTargets
-{	
-	return mRetainsTargets;
 }
 
 
@@ -970,7 +929,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 	
 	if([mUndoStack count] > 0 )
 	{
-		GCUndoGroup* group = [[[self peekUndo] retain] autorelease];
+		GCUndoGroup* group = [self peekUndo];
 		[mUndoStack removeLastObject];
 		
 		return group;
@@ -986,7 +945,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 	if([mRedoStack count] > 0 )
 	{
-		GCUndoGroup* group = [[[self peekRedo] retain] autorelease];
+		GCUndoGroup* group = [self peekRedo];
 		[mRedoStack removeLastObject];
 		
 		return group;
@@ -1084,13 +1043,14 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			
 			[newTaskGroup setActionName:[NSString stringWithFormat:@"%@ (%lu: %@)", [topGroup actionName], (unsigned long)++suffix, selString ]];
 			[self pushGroupOntoUndoStack:newTaskGroup];
-			[newTaskGroup release];
 		}
 	}
 }
 
 #pragma mark -
 #pragma mark - as a NSObject
+
+@synthesize runLoopModes = mRunLoopModes;
 
 - (id)					init
 {
@@ -1101,7 +1061,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 		mRedoStack = [[NSMutableArray alloc] init];
 		
 		mGroupsByEvent = YES;
-		mRunLoopModes = [[NSArray arrayWithObject:NSDefaultRunLoopMode] retain];
+		mRunLoopModes = [NSArray arrayWithObject:NSDefaultRunLoopMode];
 		mAutoDeleteEmptyGroups = YES;
 		mCoalKind = kGCCoalesceLastTask;
 		
@@ -1117,13 +1077,7 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (void)				dealloc
 {
-	[[NSRunLoop mainRunLoop] cancelPerformSelectorsWithTarget:self];
-	
-	[mUndoStack release];
-	[mRedoStack release];
-	[mRunLoopModes release];
-	[mProxy release];
-	[super dealloc];
+	[[NSRunLoop mainRunLoop] cancelPerformSelectorsWithTarget:self];	
 }
 
 
@@ -1304,8 +1258,6 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 				[mTasks removeObject:task];
 		}
 	}
-	
-	[temp release];
 }
 
 
@@ -1314,8 +1266,6 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 {
 	// sets the group's action name. In general this is automatically handled by the owning undo manager
 	
-	[name retain];
-	[mActionName release];
 	mActionName = name;
 }
 
@@ -1373,16 +1323,6 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 
 
-- (void)				dealloc
-{
-	//NSLog(@"deallocating undo group %@", self );
-	
-	[mTasks release];
-	[mActionName release];
-	[super dealloc];
-}
-
-
 - (NSString*)			description
 {
 	return [NSString stringWithFormat:@"%@ '%@' %lu tasks: %@", [super description], [self actionName], (unsigned long)[mTasks count], mTasks];
@@ -1394,6 +1334,8 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 #pragma mark -
 
 @implementation GCConcreteUndoTask
+
+@synthesize target = mTarget;
 
 - (id)					initWithInvocation:(NSInvocation*) inv
 {
@@ -1411,11 +1353,10 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 			mTarget = [inv target];
 			[inv setTarget:nil];
 			[inv retainArguments];
-			mInvocation = [inv retain];
+			mInvocation = inv;
 		}
 		else
 		{
-			[self autorelease];
 			self = nil;
 		}
 	}
@@ -1452,27 +1393,6 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 }
 
 
-- (void)				setTarget:(id) target retained:(BOOL) retainIt
-{
-	// sets the invocation's target, optionally retaining it.
-	
-	if( retainIt )
-		[target retain];
-	
-	if( mTargetRetained )
-		[mTarget release];
-	
-	mTarget = target;
-	mTargetRetained = retainIt;
-}
-
-
-- (id)					target
-{
-	return mTarget;
-}
-
-
 - (SEL)					selector
 {
 	return [mInvocation selector];
@@ -1506,20 +1426,8 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 
 - (id)					init
 {
-	[self autorelease];
+    self = nil;
 	return nil;
-}
-
-
-
-- (void)				dealloc
-{
-	[mInvocation release];
-	
-	if( mTargetRetained )
-		[mTarget release];
-	
-	[super dealloc];
 }
 
 

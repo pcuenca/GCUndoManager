@@ -46,7 +46,6 @@ extern NSString * const GCUndoManagerActionKey;
 @private
 	NSMutableArray*		mUndoStack;				// list of groups making up the undo stack
 	NSMutableArray*		mRedoStack;				// list of groups making up the redo stack
-	NSArray*			mRunLoopModes;			// current run loop modes, used by automatic grouping by event
 	id					mNextTarget;			// next prepared target
 	GCUndoGroup*		mOpenGroupRef;			// internal reference to current open group
 	GCUndoManagerProxy*	mProxy;					// the proxy object returned by -prepareWithInvocationTarget: if proxying is used
@@ -59,7 +58,6 @@ extern NSString * const GCUndoManagerActionKey;
 	BOOL				mGroupsByEvent;			// YES if automatic grouping occurs for the main loop event cycle
 	BOOL				mCoalescing;			// YES if consecutive tasks are coalesced
 	BOOL				mAutoDeleteEmptyGroups;	// YES if empty groups are automatically removed from the stack
-	BOOL				mRetainsTargets;		// YES if invocation targets are retained
 	BOOL				mIsRemovingTargets;		// YES during stack clean-up to prevent re-entrancy
 	BOOL				mIsInCheckpoint;		// YES during the notification processing for a checkpoint
 }
@@ -74,8 +72,7 @@ extern NSString * const GCUndoManagerActionKey;
 - (BOOL)				groupsByEvent;
 - (void)				setGroupsByEvent:(BOOL) groupByEvent;
 
-- (NSArray*)			runLoopModes;
-- (void)				setRunLoopModes:(NSArray*) modes;
+@property(nonatomic, strong) NSArray * runLoopModes;      // current run loop modes, used by automatic grouping by event
 
 // enabling undo registration
 
@@ -163,10 +160,6 @@ extern NSString * const GCUndoManagerActionKey;
 - (void)				setCoalescingKind:(GCUndoTaskCoalescingKind) kind;
 - (GCUndoTaskCoalescingKind) coalescingKind;
 
-// retaining targets (default = NO)
-
-- (void)				setRetainsTargets:(BOOL) retainsTargets;
-- (BOOL)				retainsTargets;
 - (void)				setNextTarget:(id) target;
 
 // getting/resetting change count
@@ -275,14 +268,12 @@ extern NSString * const GCUndoManagerActionKey;
 {
 @private
 	NSInvocation*		mInvocation;
-	id					mTarget;
-	BOOL				mTargetRetained;
 }
+
+@property( assign ) id target;
 
 - (id)					initWithInvocation:(NSInvocation*) inv;
 - (id)					initWithTarget:(id) target selector:(SEL) selector object:(id) object;
-- (void)				setTarget:(id) target retained:(BOOL) retainIt;
-- (id)					target;
 - (SEL)					selector;
 - (NSInvocation *)		invocation;
 
