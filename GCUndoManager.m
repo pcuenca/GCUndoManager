@@ -436,12 +436,12 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 	if([self canUndo])
 	{
 		if( actionName )
-			return [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"Undo", nil), actionName];
+			return [NSString stringWithFormat:@"%@ %@", @"Undo", actionName];
 		else
-			return NSLocalizedString(@"Undo", nil);
+			return @"Undo";
 	}
 	else
-		return NSLocalizedString(@"Nothing To Undo", nil);
+		return @"Nothing To Undo";
 }
 
 
@@ -451,12 +451,12 @@ NSString * const GCUndoManagerActionKey = @"GCUndoManagerActionKey";
 	if([self canRedo])
 	{
 		if( actionName )
-			return [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"Redo", nil), actionName];
+			return [NSString stringWithFormat:@"%@ %@", @"Redo", actionName];
 		else
-			return NSLocalizedString(@"Redo", nil);
+			return @"Redo";
 	}
 	else
-		return NSLocalizedString(@"Nothing To Redo", nil);
+		return @"Nothing To Redo";
 }
 
 
